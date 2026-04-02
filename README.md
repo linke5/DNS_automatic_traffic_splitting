@@ -118,14 +118,14 @@ make linux-arm64
 在线一键安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hamster-Prime/DNS_automatic_traffic_splitting/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/linke5/DNS_automatic_traffic_splitting/main/install.sh | sudo bash
 ```
 
 指定命令执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hamster-Prime/DNS_automatic_traffic_splitting/main/install.sh | sudo bash -s -- install
-curl -fsSL https://raw.githubusercontent.com/Hamster-Prime/DNS_automatic_traffic_splitting/main/install.sh | sudo bash -s -- update
+curl -fsSL https://raw.githubusercontent.com/linke5/DNS_automatic_traffic_splitting/main/install.sh | sudo bash -s -- install
+curl -fsSL https://raw.githubusercontent.com/linke5/DNS_automatic_traffic_splitting/main/install.sh | sudo bash -s -- update
 ```
 
 如果你在 fork 或测试分支上使用，也可以覆盖仓库或版本：

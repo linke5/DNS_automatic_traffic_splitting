@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly REPO="${DOH_AUTOPROXY_REPO:-Hamster-Prime/DNS_automatic_traffic_splitting}"
+readonly REPO="${DOH_AUTOPROXY_REPO:-linke5/DNS_automatic_traffic_splitting}"
 readonly INSTALL_DIR="${DOH_AUTOPROXY_INSTALL_DIR:-/usr/local/bin}"
 readonly CONFIG_DIR="${DOH_AUTOPROXY_CONFIG_DIR:-/etc/doh-autoproxy}"
 readonly SERVICE_NAME="${DOH_AUTOPROXY_SERVICE_NAME:-doh-autoproxy}"
