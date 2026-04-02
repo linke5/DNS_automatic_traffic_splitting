@@ -19,7 +19,11 @@ type DoTServer struct {
 }
 
 func NewDoTServer(cfg *config.Config, r *router.Router, cm *util.CertManager) *DoTServer {
-	handler := &DNSRequestHandler{router: r}
+	return NewDoTServerWithMode(cfg, r, cm, "standard")
+}
+
+func NewDoTServerWithMode(cfg *config.Config, r *router.Router, cm *util.CertManager, mode string) *DoTServer {
+	handler := &DNSRequestHandler{router: r, protocol: "dot", listenAddr: cfg.Listen.DOT, mode: mode}
 
 	var tlsConfig *tls.Config
 

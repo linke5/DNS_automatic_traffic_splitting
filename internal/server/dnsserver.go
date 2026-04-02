@@ -17,25 +17,32 @@ type DNSServer struct {
 	udpServer *dns.Server
 	tcpServer *dns.Server
 	router    *router.Router
+	mode      string
 }
 
 func NewDNSServer(cfg *config.Config, r *router.Router) *DNSServer {
-	handler := &DNSRequestHandler{router: r}
+	return NewDNSServerWithMode(cfg, r, "standard")
+}
+
+func NewDNSServerWithMode(cfg *config.Config, r *router.Router, mode string) *DNSServer {
+	handlerUDP := &DNSRequestHandler{router: r, protocol: "udp", listenAddr: cfg.Listen.DNSUDP, mode: mode}
+	handlerTCP := &DNSRequestHandler{router: r, protocol: "tcp", listenAddr: cfg.Listen.DNSTCP, mode: mode}
 
 	var udpServer, tcpServer *dns.Server
 
 	if cfg.Listen.DNSUDP != "" {
-		udpServer = &dns.Server{Addr: cfg.Listen.DNSUDP, Net: "udp", Handler: handler, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second}
+		udpServer = &dns.Server{Addr: cfg.Listen.DNSUDP, Net: "udp", Handler: handlerUDP, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second}
 	}
 
 	if cfg.Listen.DNSTCP != "" {
-		tcpServer = &dns.Server{Addr: cfg.Listen.DNSTCP, Net: "tcp", Handler: handler, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second}
+		tcpServer = &dns.Server{Addr: cfg.Listen.DNSTCP, Net: "tcp", Handler: handlerTCP, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second}
 	}
 
 	return &DNSServer{
 		udpServer: udpServer,
 		tcpServer: tcpServer,
 		router:    r,
+		mode:      mode,
 	}
 }
 
@@ -76,7 +83,10 @@ func (s *DNSServer) Stop() error {
 }
 
 type DNSRequestHandler struct {
-	router *router.Router
+	router     *router.Router
+	protocol   string
+	listenAddr string
+	mode       string
 }
 
 func (h *DNSRequestHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
@@ -91,6 +101,11 @@ func (h *DNSRequestHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	ctx = router.WithRequestMeta(ctx, router.RequestMeta{
+		Listener:     h.protocol,
+		ListenerPort: h.listenAddr,
+		ServiceMode:  h.mode,
+	})
 
 	resp, err := h.router.Route(ctx, req, clientIP)
 	if err != nil {

@@ -147,7 +147,9 @@ listen:
   doh: "443"
   doh_path: "/dns-query"
   dot: "853"
+  dot_sni: "dns.example.com"
   doq: "853"
+  doq_sni: "dns.example.com"
 
 auto_cert:
   enabled: false
@@ -187,6 +189,34 @@ upstreams:
     - address: "dns.nextdns.io"
       protocol: "doq"
       ecs_ip: "8.8.8.8"
+
+parallel_return:
+  enabled: false
+  listen:
+    dns_udp: "5353"
+    dns_tcp: "5353"
+    doh: "8443"
+    doh_path: "/parallel-dns-query"
+    dot: "853"
+    dot_sni: "parallel.example.com"
+    doq: "853"
+    doq_sni: "parallel.example.com"
+  upstreams:
+    cn:
+      - address: "223.5.5.5"
+        protocol: "udp"
+        ecs_ip: "114.114.114.114"
+      - address: "223.6.6.6"
+        protocol: "dot"
+        ecs_ip: "114.114.114.114"
+    overseas:
+      - address: "1.1.1.1"
+        protocol: "doh"
+        ecs_ip: "8.8.8.8"
+        http3: true
+      - address: "8.8.8.8"
+        protocol: "dot"
+        ecs_ip: "8.8.8.8"
 
 geo_data:
   geoip_dat: "GeoIP.dat"

@@ -292,6 +292,7 @@
                     <i class="fa-solid fa-save mr-2 md:mr-0"></i> <span class="hidden md:inline ml-2">{{ loading ? t('saving') : t('save_apply') }}</span>
                 </button>
                 <span v-if="unsavedChanges" class="text-xs font-bold text-amber-500 dark:text-amber-400 mr-2 hidden md:inline-block">{{ t('unsaved_changes') }}</span>
+                <span v-if="configValidationError" class="text-xs font-bold text-red-500 dark:text-red-400 hidden md:inline-block">{{ configValidationError }}</span>
                 
                 <button v-if="currentView === 'logs'" @click="fetchLogs(1)" class="btn-glass btn-glass-secondary px-4 py-2 rounded-lg text-sm font-medium flex items-center">
                     <i class="fa-solid fa-rotate mr-2"></i> <span class="hidden md:inline">{{ t('refresh') }}</span>
@@ -510,6 +511,9 @@
                                     {{ t('log_type') }} <i class="sort-icon fa-solid" :class="getSortIcon('type')"></i>
                                 </th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                                    {{ t('log_listener') }}
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                                     {{ t('log_answer') }}
                                 </th>
                                 <th @click="sortBy('upstream')" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 group">
@@ -534,6 +538,10 @@
                                 </td>
                                 <td class="px-4 py-2 text-slate-800 dark:text-slate-200 font-medium break-all">{{ log.domain }}</td>
                                 <td class="px-4 py-2 text-slate-500 dark:text-slate-400 text-xs">{{ log.type }}</td>
+                                <td class="px-4 py-2 whitespace-nowrap text-xs">
+                                    <div class="font-mono text-slate-700 dark:text-slate-200">{{ (log.listener || '-').toUpperCase() }} {{ log.listener_port || '' }}</div>
+                                    <div class="text-slate-400 dark:text-slate-500">{{ log.service_mode === 'parallel' ? t('service_mode_parallel') : t('service_mode_standard') }}</div>
+                                </td>
                                 <td class="px-4 py-2 text-slate-600 dark:text-slate-300 font-mono text-xs truncate max-w-[200px]" :title="log.answer">{{ log.answer }}</td>
                                 <td class="px-4 py-2 whitespace-nowrap">
                                     <span class="px-2 py-0.5 inline-flex text-xs leading-4 font-medium rounded-full" :class="getUpstreamClass(log.upstream)">
@@ -546,7 +554,7 @@
                                 <td class="px-4 py-2 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono text-xs">{{ log.duration_ms }}ms</td>
                             </tr>
                             <tr v-if="logs.length === 0">
-                                <td colspan="8" class="px-4 py-12 text-center text-slate-400">
+                                <td colspan="9" class="px-4 py-12 text-center text-slate-400">
                                     <i class="fa-solid fa-inbox text-4xl mb-3 opacity-30"></i>
                                     <p>{{ t('no_logs') }}</p>
                                 </td>
@@ -618,7 +626,32 @@
                         <form-input :label="t('doh_https')" v-model="config.listen.doh" placeholder="443" :disabled="!canEdit"></form-input>
                         <form-input :label="t('doh_path')" v-model="config.listen.doh_path" placeholder="/dns-query" :disabled="!canEdit"></form-input>
                         <form-input :label="t('dot_tls')" v-model="config.listen.dot" placeholder="853" :disabled="!canEdit"></form-input>
+                        <form-input label="DoT SNI" v-model="config.listen.dot_sni" placeholder="dns.example.com" :disabled="!canEdit"></form-input>
                         <form-input :label="t('doq_quic')" v-model="config.listen.doq" placeholder="853" :disabled="!canEdit"></form-input>
+                        <form-input label="DoQ SNI" v-model="config.listen.doq_sni" placeholder="dns.example.com" :disabled="!canEdit"></form-input>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden">
+                    <div class="bg-slate-50/80 dark:bg-slate-900/80 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fa-solid fa-layer-group text-slate-400 mr-3"></i>
+                            <h3 class="text-lg font-medium text-slate-900 dark:text-slate-100">{{ t('setting_parallel_return') }}</h3>
+                        </div>
+                        <toggle-switch :label="t('parallel_return_enabled')" v-model="config.parallel_return.enabled" :disabled="!canEdit"></toggle-switch>
+                    </div>
+                    <div class="p-6 space-y-6 bg-white dark:bg-slate-950">
+                        <p class="text-sm text-slate-500 dark:text-slate-400">{{ t('parallel_return_help') }}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                            <form-input :label="t('dns_udp')" v-model="config.parallel_return.listen.dns_udp" placeholder="5353" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input :label="t('dns_tcp')" v-model="config.parallel_return.listen.dns_tcp" placeholder="5353" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input :label="t('doh_https')" v-model="config.parallel_return.listen.doh" placeholder="8443" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input :label="t('doh_path')" v-model="config.parallel_return.listen.doh_path" placeholder="/parallel-dns-query" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input :label="t('dot_tls')" v-model="config.parallel_return.listen.dot" placeholder="" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input label="DoT SNI" v-model="config.parallel_return.listen.dot_sni" placeholder="parallel.example.com" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input :label="t('doq_quic')" v-model="config.parallel_return.listen.doq" placeholder="" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <form-input label="DoQ SNI" v-model="config.parallel_return.listen.doq_sni" placeholder="parallel.example.com" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                        </div>
                     </div>
                 </div>
 
@@ -840,6 +873,49 @@
                         </div>
                     </div>
                  </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden">
+                    <div class="bg-slate-50/80 dark:bg-slate-900/80 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center">
+                        <i class="fa-solid fa-diagram-project text-slate-400 mr-3"></i>
+                        <h3 class="text-lg font-medium text-slate-900 dark:text-slate-100">{{ t('setting_parallel_upstreams') }}</h3>
+                    </div>
+                    <div class="p-6 bg-white dark:bg-slate-950">
+                        <div class="flex space-x-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg mb-6 w-fit">
+                            <button @click="upstreamTab = 'cn'" class="px-4 py-2 rounded-md text-sm font-medium transition-all" :class="upstreamTab === 'cn' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'">{{ t('tab_cn') }}</button>
+                            <button @click="upstreamTab = 'overseas'" class="px-4 py-2 rounded-md text-sm font-medium transition-all" :class="upstreamTab === 'overseas' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'">{{ t('tab_overseas') }}</button>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div v-for="(server, index) in currentParallelUpstreams" :key="server._id" class="bg-slate-50 dark:bg-slate-900 rounded-xl p-5 border border-slate-200 dark:border-slate-800 relative group hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                                <div class="absolute top-3 right-3 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button v-if="canEdit" @click="removeParallelUpstream(upstreamTab, index)" class="text-slate-400 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-slate-800 shadow-sm" title="Delete">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-end">
+                                    <form-input :label="t('address')" v-model="server.address" placeholder="1.1.1.1:53" :disabled="!canEdit || !config.parallel_return.enabled" input-class="h-10"></form-input>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{{ t('protocol') }}</label>
+                                        <select :disabled="!canEdit || !config.parallel_return.enabled" v-model="server.protocol" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border shadow-sm bg-white dark:bg-slate-950 dark:text-white disabled:bg-slate-100 disabled:text-slate-500 h-10 transition-all">
+                                            <option value="udp">UDP</option>
+                                            <option value="tcp">TCP</option>
+                                            <option value="doh">DoH</option>
+                                            <option value="dot">DoT</option>
+                                            <option value="doq">DoQ</option>
+                                        </select>
+                                    </div>
+                                    <form-input :label="t('ecs_ip')" v-model="server.ecs_ip" placeholder="Client Subnet IP" :disabled="!canEdit || !config.parallel_return.enabled" input-class="h-10"></form-input>
+                                </div>
+                                <div class="mt-4 flex flex-wrap gap-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                                    <toggle-switch v-if="showPipeline(server.protocol)" label="Pipeline" v-model="server.pipeline" :disabled="!canEdit || !config.parallel_return.enabled"></toggle-switch>
+                                    <toggle-switch v-if="showH3(server.protocol)" label="HTTP/3" v-model="server.http3" :disabled="!canEdit || !config.parallel_return.enabled"></toggle-switch>
+                                    <toggle-switch v-if="showVerify(server.protocol)" label="Skip Verify" v-model="server.insecure_skip_verify" :disabled="!canEdit || !config.parallel_return.enabled"></toggle-switch>
+                                </div>
+                            </div>
+                            <button v-if="canEdit" @click="addParallelUpstream(upstreamTab)" :disabled="!config.parallel_return.enabled" class="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-medium flex items-center justify-center disabled:opacity-50"><i class="fa-solid fa-plus-circle mr-2"></i> {{ t('add_server') }}</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -955,6 +1031,8 @@
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_time') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ formatTime(modal.log.time) }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_client') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.client_ip }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_downstream_ecs') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.downstream_ecs || '-' }}</span></div>
+                    <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_listener') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ (modal.log.listener || '-').toUpperCase() }} {{ modal.log.listener_port || '' }}</span></div>
+                    <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_service_mode') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.service_mode === 'parallel' ? t('service_mode_parallel') : t('service_mode_standard') }}</span></div>
                     <div class="col-span-2"><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_domain') }}</span> <span class="font-bold text-lg text-slate-900 dark:text-white break-all">{{ modal.log.domain }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_type') }}</span> <span class="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200">{{ modal.log.type }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_duration') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.duration_ms }}ms</span></div>
@@ -1041,6 +1119,8 @@ const i18nData = {
         filter_logs_placeholder: "搜索 客户端IP / ECS / 域名 / 类型 / 状态...",
         log_time: "时间",
         log_client: "客户端",
+        log_listener: "入站监听",
+        log_service_mode: "服务模式",
         log_downstream_ecs: "下游 ECS",
         log_domain: "请求域名",
         log_type: "类型",
@@ -1048,11 +1128,18 @@ const i18nData = {
         log_answer: "解析结果",
         log_status: "状态",
         log_duration: "耗时",
+        service_mode_standard: "普通组",
+        service_mode_parallel: "并行组",
         no_logs: "暂无查询日志",
         setting_querylog: "日志记录设置",
         setting_listen: "服务监听端口",
         setting_bootstrap: "Bootstrap DNS",
         setting_upstreams: "上游 DNS 服务器",
+        setting_parallel_return: "并行返回",
+        setting_parallel_listen: "并行返回监听",
+        setting_parallel_upstreams: "并行返回上游组",
+        parallel_return_enabled: "启用并行返回",
+        parallel_return_help: "保留原有 Geo 分流策略，但对命中的上游组并发查询并把多个成功解析结果原样聚合返回给下游。",
         setting_hosts: "自定义 Hosts",
         setting_rules: "自定义分流规则",
         setting_guest_mode: "开启游客模式",
@@ -1139,6 +1226,8 @@ const i18nData = {
         filter_logs_placeholder: "Search Client IP / ECS / Domain / Type / Status...",
         log_time: "Time",
         log_client: "Client",
+        log_listener: "Listener",
+        log_service_mode: "Service Mode",
         log_downstream_ecs: "Downstream ECS",
         log_domain: "Domain",
         log_type: "Type",
@@ -1146,11 +1235,18 @@ const i18nData = {
         log_answer: "Answer",
         log_status: "Status",
         log_duration: "Duration",
+        service_mode_standard: "Standard",
+        service_mode_parallel: "Parallel",
         no_logs: "No logs found",
         setting_querylog: "Query Log",
         setting_listen: "Listening Ports",
         setting_bootstrap: "Bootstrap DNS",
         setting_upstreams: "Upstream Servers",
+        setting_parallel_return: "Parallel Return",
+        setting_parallel_listen: "Parallel Return Listen",
+        setting_parallel_upstreams: "Parallel Return Upstreams",
+        parallel_return_enabled: "Enable Parallel Return",
+        parallel_return_help: "Keep the existing Geo split strategy, but query all servers in the selected group and merge successful answers back to downstream clients.",
         setting_hosts: "Custom Hosts",
         setting_rules: "Custom Rules",
         setting_guest_mode: "Enable Guest Mode",
@@ -1307,6 +1403,11 @@ const app = Vue.createApp({
                 bootstrap_dns: [],
                 tls_certificates: [],
                 upstreams: { cn: [], overseas: [] },
+                parallel_return: {
+                    enabled: false,
+                    listen: { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' },
+                    upstreams: { cn: [], overseas: [] }
+                },
                 geo_data: {},
                 auto_cert: { domains: [] },
                 web_ui: {},
@@ -1350,6 +1451,9 @@ const app = Vue.createApp({
         currentUpstreams() {
             return this.upstreamTab === 'cn' ? this.config.upstreams.cn : this.config.upstreams.overseas;
         },
+        currentParallelUpstreams() {
+            return this.upstreamTab === 'cn' ? this.config.parallel_return.upstreams.cn : this.config.parallel_return.upstreams.overseas;
+        },
         canEdit() {
             return !this.authEnabled || this.isLoggedIn;
         },
@@ -1374,6 +1478,38 @@ const app = Vue.createApp({
                 if (valA > valB) return 1 * this.sortOrder;
                 return 0;
             });
+        },
+        configValidationError() {
+            const main = this.config.listen || {};
+            const parallel = (this.config.parallel_return && this.config.parallel_return.listen) || {};
+            const normalizePath = (p) => {
+                if (!p) return '/dns-query';
+                return p.startsWith('/') ? p : '/' + p;
+            };
+            const normalizeSNI = (v) => (v || '').trim().toLowerCase();
+
+            if (this.config.parallel_return?.enabled) {
+                if (main.doh && parallel.doh && main.doh === parallel.doh && normalizePath(main.doh_path) === normalizePath(parallel.doh_path)) {
+                    return '主服务和并行返回复用 DoH 端口时，DoH Path 不能相同';
+                }
+                if (main.dot && parallel.dot && main.dot === parallel.dot) {
+                    if (!normalizeSNI(main.dot_sni) || !normalizeSNI(parallel.dot_sni)) {
+                        return '主服务和并行返回复用 DoT 端口时，必须分别配置不同的 DoT SNI';
+                    }
+                    if (normalizeSNI(main.dot_sni) === normalizeSNI(parallel.dot_sni)) {
+                        return '主服务和并行返回复用 DoT 端口时，DoT SNI 不能相同';
+                    }
+                }
+                if (main.doq && parallel.doq && main.doq === parallel.doq) {
+                    if (!normalizeSNI(main.doq_sni) || !normalizeSNI(parallel.doq_sni)) {
+                        return '主服务和并行返回复用 DoQ 端口时，必须分别配置不同的 DoQ SNI';
+                    }
+                    if (normalizeSNI(main.doq_sni) === normalizeSNI(parallel.doq_sni)) {
+                        return '主服务和并行返回复用 DoQ 端口时，DoQ SNI 不能相同';
+                    }
+                }
+            }
+            return '';
         }
     },
     watch: {
@@ -1498,6 +1634,11 @@ const app = Vue.createApp({
                 if(!this.config.tls_certificates) this.config.tls_certificates = [];
                 if(!this.config.upstreams.cn) this.config.upstreams.cn = [];
                 if(!this.config.upstreams.overseas) this.config.upstreams.overseas = [];
+                if(!this.config.parallel_return) this.config.parallel_return = { enabled: false, listen: { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' }, upstreams: { cn: [], overseas: [] } };
+                if(!this.config.parallel_return.listen) this.config.parallel_return.listen = { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' };
+                if(!this.config.parallel_return.upstreams) this.config.parallel_return.upstreams = { cn: [], overseas: [] };
+                if(!this.config.parallel_return.upstreams.cn) this.config.parallel_return.upstreams.cn = [];
+                if(!this.config.parallel_return.upstreams.overseas) this.config.parallel_return.upstreams.overseas = [];
                 if(!this.config.auto_cert) this.config.auto_cert = { domains: [] };
                 if(!this.config.web_ui) this.config.web_ui = { guest_mode: false };
                 if(this.config.web_ui && this.config.web_ui.guest_mode === undefined) this.config.web_ui.guest_mode = false;
@@ -1513,6 +1654,8 @@ const app = Vue.createApp({
                 const addId = (s) => { if(!s._id) s._id = Date.now() + (idCounter++); return s; };
                 this.config.upstreams.cn.forEach(addId);
                 this.config.upstreams.overseas.forEach(addId);
+                this.config.parallel_return.upstreams.cn.forEach(addId);
+                this.config.parallel_return.upstreams.overseas.forEach(addId);
 
                 const strip = (p) => p ? p.toString().replace(':', '') : '';
                 if(this.config.listen) {
@@ -1521,6 +1664,17 @@ const app = Vue.createApp({
                     this.config.listen.doh = strip(this.config.listen.doh);
                     this.config.listen.dot = strip(this.config.listen.dot);
                     this.config.listen.doq = strip(this.config.listen.doq);
+                    if(this.config.listen.dot_sni === undefined) this.config.listen.dot_sni = '';
+                    if(this.config.listen.doq_sni === undefined) this.config.listen.doq_sni = '';
+                }
+                if(this.config.parallel_return.listen) {
+                    this.config.parallel_return.listen.dns_udp = strip(this.config.parallel_return.listen.dns_udp);
+                    this.config.parallel_return.listen.dns_tcp = strip(this.config.parallel_return.listen.dns_tcp);
+                    this.config.parallel_return.listen.doh = strip(this.config.parallel_return.listen.doh);
+                    this.config.parallel_return.listen.dot = strip(this.config.parallel_return.listen.dot);
+                    this.config.parallel_return.listen.doq = strip(this.config.parallel_return.listen.doq);
+                    if(this.config.parallel_return.listen.dot_sni === undefined) this.config.parallel_return.listen.dot_sni = '';
+                    if(this.config.parallel_return.listen.doq_sni === undefined) this.config.parallel_return.listen.doq_sni = '';
                 }
             } catch(e) {
                 console.error(e);
@@ -1528,12 +1682,20 @@ const app = Vue.createApp({
         },
         async saveConfig() {
             if (!this.canEdit) return;
+            if (this.configValidationError) {
+                alert(this.configValidationError);
+                return;
+            }
             this.loading = true;
             this.modal = { show: true, type: 'saving', title: this.t('saving_title'), maxWidth: 'sm:max-w-sm' };
             try {
                 const cleanConfig = JSON.parse(JSON.stringify(this.config));
                 if(cleanConfig.upstreams.cn) cleanConfig.upstreams.cn.forEach(s => delete s._id);
                 if(cleanConfig.upstreams.overseas) cleanConfig.upstreams.overseas.forEach(s => delete s._id);
+                if(cleanConfig.parallel_return && cleanConfig.parallel_return.upstreams) {
+                    if(cleanConfig.parallel_return.upstreams.cn) cleanConfig.parallel_return.upstreams.cn.forEach(s => delete s._id);
+                    if(cleanConfig.parallel_return.upstreams.overseas) cleanConfig.parallel_return.upstreams.overseas.forEach(s => delete s._id);
+                }
 
                 cleanConfig.hosts = {};
                 cleanConfig.rules = this.rulesArray.reduce((acc, cur) => { if(cur.domain) acc[cur.domain] = cur.target; return acc; }, {});
@@ -1656,10 +1818,21 @@ const app = Vue.createApp({
             if(type === 'cn') this.config.upstreams.cn.push(empty);
             else this.config.upstreams.overseas.push(empty);
         },
+        addParallelUpstream(type) {
+            const empty = { address: "", protocol: "udp", ecs_ip: "", pipeline: false, http3: false, insecure_skip_verify: false, _id: Date.now() };
+            if(type === 'cn') this.config.parallel_return.upstreams.cn.push(empty);
+            else this.config.parallel_return.upstreams.overseas.push(empty);
+        },
         removeUpstream(type, idx) {
             if(confirm("Are you sure you want to delete this upstream?")) {
                 if(type === 'cn') this.config.upstreams.cn.splice(idx, 1);
                 else this.config.upstreams.overseas.splice(idx, 1);
+            }
+        },
+        removeParallelUpstream(type, idx) {
+            if(confirm("Are you sure you want to delete this upstream?")) {
+                if(type === 'cn') this.config.parallel_return.upstreams.cn.splice(idx, 1);
+                else this.config.parallel_return.upstreams.overseas.splice(idx, 1);
             }
         },
         toggleSort() {

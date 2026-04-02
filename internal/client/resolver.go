@@ -13,6 +13,8 @@ type raceResult struct {
 	err  error
 }
 
+const failPriorityUnknown = 100
+
 func RaceResolve(ctx context.Context, req *dns.Msg, clients []DNSClient) (*dns.Msg, error) {
 	if len(clients) == 0 {
 		return nil, fmt.Errorf("没有可用的上游客户端")
@@ -32,8 +34,9 @@ func RaceResolve(ctx context.Context, req *dns.Msg, clients []DNSClient) (*dns.M
 	}
 
 	var (
-		bestFail *dns.Msg // 保存 SERVFAIL/NXDOMAIN 等非成功响应作为备选
-		lastErr  error
+		bestFail         *dns.Msg
+		bestFailPriority = failPriorityUnknown
+		lastErr          error
 	)
 
 	timer := time.NewTimer(5 * time.Second)
@@ -46,13 +49,18 @@ func RaceResolve(ctx context.Context, req *dns.Msg, clients []DNSClient) (*dns.M
 				lastErr = r.err
 				continue
 			}
+			if r.resp == nil {
+				continue
+			}
 			// 真正成功的响应（NOERROR），立即返回
 			if r.resp.Rcode == dns.RcodeSuccess {
 				return r.resp, nil
 			}
-			// NXDOMAIN / SERVFAIL 等：保存但继续等其他上游
-			if bestFail == nil {
+
+			p := failPriority(r.resp.Rcode)
+			if bestFail == nil || p < bestFailPriority {
 				bestFail = r.resp
+				bestFailPriority = p
 			}
 		case <-timer.C:
 			// 超时，返回已有的最佳结果
@@ -74,4 +82,19 @@ func RaceResolve(ctx context.Context, req *dns.Msg, clients []DNSClient) (*dns.M
 		return nil, fmt.Errorf("所有上游查询均失败: %w", lastErr)
 	}
 	return nil, fmt.Errorf("未知错误：未收到任何响应")
+}
+
+func failPriority(rcode int) int {
+	switch rcode {
+	case dns.RcodeNameError:
+		return 1
+	case dns.RcodeRefused:
+		return 2
+	case dns.RcodeNotImplemented:
+		return 3
+	case dns.RcodeServerFailure:
+		return 4
+	default:
+		return 10
+	}
 }

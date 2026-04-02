@@ -28,6 +28,7 @@ type Router struct {
 	logger          *querylog.QueryLogger
 	cnClients       []client.DNSClient
 	overseasClients []client.DNSClient
+	parallelReturn  bool
 
 	cnStats       []*client.StatsClient
 	overseasStats []*client.StatsClient
@@ -36,10 +37,15 @@ type Router struct {
 }
 
 func NewRouter(cfg *config.Config, geoManager *GeoDataManager, logger *querylog.QueryLogger) *Router {
+	return NewRouterWithMode(cfg, geoManager, logger, false)
+}
+
+func NewRouterWithMode(cfg *config.Config, geoManager *GeoDataManager, logger *querylog.QueryLogger, parallelReturn bool) *Router {
 	r := &Router{
-		config: cfg,
-		geo:    geoManager,
-		logger: logger,
+		config:         cfg,
+		geo:            geoManager,
+		logger:         logger,
+		parallelReturn: parallelReturn,
 	}
 
 	for domain, target := range cfg.Rules {
@@ -102,6 +108,7 @@ func (r *Router) Route(ctx context.Context, req *dns.Msg, clientIP string) (*dns
 	}
 
 	downstreamECS := client.ExtractECS(req)
+	meta := RequestMetaFromContext(ctx)
 	resp, upstream, err := r.routeInternal(ctx, req)
 
 	duration := time.Since(start).Milliseconds()
@@ -147,6 +154,9 @@ func (r *Router) Route(ctx context.Context, req *dns.Msg, clientIP string) (*dns
 	if r.logger != nil {
 		r.logger.AddLog(&querylog.LogEntry{
 			ClientIP:      clientIP,
+			Listener:      meta.Listener,
+			ListenerPort:  meta.ListenerPort,
+			ServiceMode:   meta.ServiceMode,
 			DownstreamECS: downstreamECS,
 			Domain:        qName,
 			Type:          qType,
@@ -202,10 +212,10 @@ func (r *Router) routeInternal(ctx context.Context, req *dns.Msg) (*dns.Msg, str
 	if rule, ok := r.config.Rules[qName]; ok {
 		switch strings.ToLower(rule) {
 		case "cn":
-			resp, err := client.RaceResolve(ctx, req, r.cnClients)
+			resp, err := r.resolveByMode(ctx, req, r.cnClients)
 			return resp, "Rule(CN)", err
 		case "overseas":
-			resp, err := client.RaceResolve(ctx, req, r.overseasClients)
+			resp, err := r.resolveByMode(ctx, req, r.overseasClients)
 			return resp, "Rule(Overseas)", err
 		default:
 		}
@@ -215,10 +225,10 @@ func (r *Router) routeInternal(ctx context.Context, req *dns.Msg) (*dns.Msg, str
 		if rr.Pattern.MatchString(qName) {
 			switch strings.ToLower(rr.Target) {
 			case "cn":
-				resp, err := client.RaceResolve(ctx, req, r.cnClients)
+				resp, err := r.resolveByMode(ctx, req, r.cnClients)
 				return resp, "Rule(Regex/CN)", err
 			case "overseas":
-				resp, err := client.RaceResolve(ctx, req, r.overseasClients)
+				resp, err := r.resolveByMode(ctx, req, r.overseasClients)
 				return resp, "Rule(Regex/Overseas)", err
 			}
 		}
@@ -227,10 +237,10 @@ func (r *Router) routeInternal(ctx context.Context, req *dns.Msg) (*dns.Msg, str
 	if geoSiteRule := r.geo.LookupGeoSite(qName); geoSiteRule != "" {
 		switch strings.ToLower(geoSiteRule) {
 		case "cn":
-			resp, err := client.RaceResolve(ctx, req, r.cnClients)
+			resp, err := r.resolveByMode(ctx, req, r.cnClients)
 			return resp, "GeoSite(CN)", err
 		default:
-			resp, err := client.RaceResolve(ctx, req, r.overseasClients)
+			resp, err := r.resolveByMode(ctx, req, r.overseasClients)
 			return resp, "GeoSite(Overseas)", err
 		}
 	}
@@ -245,11 +255,11 @@ func (r *Router) routeInternal(ctx context.Context, req *dns.Msg) (*dns.Msg, str
 	dualCh := make(chan dualResult, 2)
 
 	go func() {
-		resp, err := client.RaceResolve(ctx, req.Copy(), r.overseasClients)
+		resp, err := r.resolveByMode(ctx, req.Copy(), r.overseasClients)
 		dualCh <- dualResult{resp: resp, err: err, source: "overseas"}
 	}()
 	go func() {
-		resp, err := client.RaceResolve(ctx, req.Copy(), r.cnClients)
+		resp, err := r.resolveByMode(ctx, req.Copy(), r.cnClients)
 		dualCh <- dualResult{resp: resp, err: err, source: "cn"}
 	}()
 
@@ -309,4 +319,11 @@ func (r *Router) routeInternal(ctx context.Context, req *dns.Msg) (*dns.Msg, str
 		return nil, "GeoIP(Error)", fmt.Errorf("所有DNS查询均失败: overseas=%v, cn=%v", overseasResult.err, cnResult.err)
 	}
 	return nil, "GeoIP(Error)", cnResult.err
+}
+
+func (r *Router) resolveByMode(ctx context.Context, req *dns.Msg, clients []client.DNSClient) (*dns.Msg, error) {
+	if r.parallelReturn {
+		return client.AggregateResolve(ctx, req, clients)
+	}
+	return client.RaceResolve(ctx, req, clients)
 }

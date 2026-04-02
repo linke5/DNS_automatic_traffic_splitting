@@ -27,11 +27,15 @@ type ServiceManager struct {
 	CertManager *util.CertManager
 	QueryLog    *querylog.QueryLogger
 
-	DNSServer  *server.DNSServer
-	DoTServer  *server.DoTServer
-	DoHServer  *server.DoHServer
-	DoQServer  *server.DoQServer
-	ACMEServer *http.Server
+	DNSServer            *server.DNSServer
+	DoTServer            *server.DoTServer
+	DoHServer            *server.DoHServer
+	DoQServer            *server.DoQServer
+	ParallelReturnServer *server.ParallelReturnServer
+	SharedDoHServer      *server.SharedDoHServer
+	SharedDoTServer      *server.SharedDoTServer
+	SharedDoQServer      *server.SharedDoQServer
+	ACMEServer           *http.Server
 
 	stopAutoUpdate chan struct{}
 }
@@ -248,6 +252,14 @@ func (m *ServiceManager) startInternal() error {
 
 	m.Router = router.NewRouter(cfg, m.GeoManager, m.QueryLog)
 
+	var parallelRouter *router.Router
+	if cfg.ParallelReturn.Enabled {
+		parallelCfg := *cfg
+		parallelCfg.Listen = cfg.ParallelReturn.Listen
+		parallelCfg.Upstreams = cfg.ParallelReturn.Upstreams
+		parallelRouter = router.NewRouterWithMode(&parallelCfg, m.GeoManager, m.QueryLog, true)
+	}
+
 	cm, err := util.NewCertManager(cfg)
 	if err != nil {
 		log.Printf("无法初始化自动证书管理器: %v (将回退到本地证书)", err)
@@ -280,24 +292,62 @@ func (m *ServiceManager) startInternal() error {
 		m.DNSServer.Start()
 	}
 
-	if cfg.Listen.DOT != "" {
+	sharedDoH := cfg.ParallelReturn.Enabled && cfg.Listen.DOH != "" && cfg.ParallelReturn.Listen.DOH != "" && cfg.Listen.DOH == cfg.ParallelReturn.Listen.DOH
+	sharedDoT := cfg.ParallelReturn.Enabled && cfg.Listen.DOT != "" && cfg.ParallelReturn.Listen.DOT != "" && cfg.Listen.DOT == cfg.ParallelReturn.Listen.DOT
+	sharedDoQ := cfg.ParallelReturn.Enabled && cfg.Listen.DOQ != "" && cfg.ParallelReturn.Listen.DOQ != "" && cfg.Listen.DOQ == cfg.ParallelReturn.Listen.DOQ
+
+	if sharedDoH {
+		entries, err := server.BuildSharedDoHEntries(cfg, m.Router, parallelRouter)
+		if err != nil {
+			return err
+		}
+		tlsConfig, err := server.NewSharedDoHTLSConfig(cfg, m.CertManager)
+		if err != nil {
+			return fmt.Errorf("shared DoH TLS init failed: %w", err)
+		}
+		m.SharedDoHServer = server.NewSharedDoHServer(cfg.Listen.DOH, entries, tlsConfig)
+		m.SharedDoHServer.Start()
+	}
+
+	if sharedDoT {
+		tlsConfig, err := server.NewSharedTLSServerConfig(cfg, m.CertManager, "dns")
+		if err != nil {
+			return fmt.Errorf("shared DoT TLS init failed: %w", err)
+		}
+		m.SharedDoTServer = server.NewSharedDoTServer(cfg.Listen.DOT, cfg.Listen.DoTSNI, m.Router, cfg.ParallelReturn.Listen.DoTSNI, parallelRouter, tlsConfig)
+		m.SharedDoTServer.Start()
+	} else if cfg.Listen.DOT != "" {
 		m.DoTServer = server.NewDoTServer(cfg, m.Router, m.CertManager)
 		if m.DoTServer != nil {
 			m.DoTServer.Start()
 		}
 	}
 
-	if cfg.Listen.DOQ != "" {
+	if sharedDoQ {
+		tlsConfig, err := server.NewSharedTLSServerConfig(cfg, m.CertManager, "doq")
+		if err != nil {
+			return fmt.Errorf("shared DoQ TLS init failed: %w", err)
+		}
+		m.SharedDoQServer = server.NewSharedDoQServer(cfg.Listen.DOQ, cfg.Listen.DoQSNI, m.Router, cfg.ParallelReturn.Listen.DoQSNI, parallelRouter, tlsConfig)
+		m.SharedDoQServer.Start()
+	} else if cfg.Listen.DOQ != "" {
 		m.DoQServer = server.NewDoQServer(cfg, m.Router, m.CertManager)
 		if m.DoQServer != nil {
 			m.DoQServer.Start()
 		}
 	}
 
-	if cfg.Listen.DOH != "" {
+	if !sharedDoH && cfg.Listen.DOH != "" {
 		m.DoHServer = server.NewDoHServer(cfg, m.Router, m.CertManager)
 		if m.DoHServer != nil {
 			m.DoHServer.Start()
+		}
+	}
+
+	if cfg.ParallelReturn.Enabled {
+		m.ParallelReturnServer = server.NewParallelReturnServer(cfg.ParallelReturn.Listen, cfg.TLSCertificates, cfg.AutoCert, parallelRouter, m.CertManager)
+		if m.ParallelReturnServer != nil {
+			m.ParallelReturnServer.StartPartial(!sharedDoH, !sharedDoT, !sharedDoQ)
 		}
 	}
 
@@ -331,6 +381,26 @@ func (m *ServiceManager) stopInternal() error {
 	if m.DoHServer != nil {
 		m.DoHServer.Stop()
 		m.DoHServer = nil
+	}
+
+	if m.SharedDoHServer != nil {
+		m.SharedDoHServer.Stop()
+		m.SharedDoHServer = nil
+	}
+
+	if m.SharedDoTServer != nil {
+		m.SharedDoTServer.Stop()
+		m.SharedDoTServer = nil
+	}
+
+	if m.SharedDoQServer != nil {
+		m.SharedDoQServer.Stop()
+		m.SharedDoQServer = nil
+	}
+
+	if m.ParallelReturnServer != nil {
+		m.ParallelReturnServer.Stop()
+		m.ParallelReturnServer = nil
 	}
 
 	return nil

@@ -12,17 +12,18 @@ import (
 )
 
 type Config struct {
-	Listen          ListenConfig      `yaml:"listen" json:"listen"`
-	BootstrapDNS    []string          `yaml:"bootstrap_dns" json:"bootstrap_dns"`
-	Upstreams       UpstreamsConfig   `yaml:"upstreams" json:"upstreams"`
-	Hosts           map[string]string `yaml:"-" json:"hosts"`
-	Rules           map[string]string `yaml:"-" json:"rules"`
-	GeoData         GeoDataConfig     `yaml:"geo_data" json:"geo_data"`
-	AutoCert        AutoCertConfig    `yaml:"auto_cert" json:"auto_cert"`
-	TLSCertificates []TLSCertConfig   `yaml:"tls_certificates" json:"tls_certificates"`
-	WebUI           WebUIConfig       `yaml:"web_ui" json:"web_ui"`
-	QueryLog        QueryLogConfig    `yaml:"query_log" json:"query_log"`
-	ConfigDir       string            `yaml:"-" json:"-"`
+	Listen          ListenConfig         `yaml:"listen" json:"listen"`
+	BootstrapDNS    []string             `yaml:"bootstrap_dns" json:"bootstrap_dns"`
+	Upstreams       UpstreamsConfig      `yaml:"upstreams" json:"upstreams"`
+	ParallelReturn  ParallelReturnConfig `yaml:"parallel_return" json:"parallel_return"`
+	Hosts           map[string]string    `yaml:"-" json:"hosts"`
+	Rules           map[string]string    `yaml:"-" json:"rules"`
+	GeoData         GeoDataConfig        `yaml:"geo_data" json:"geo_data"`
+	AutoCert        AutoCertConfig       `yaml:"auto_cert" json:"auto_cert"`
+	TLSCertificates []TLSCertConfig      `yaml:"tls_certificates" json:"tls_certificates"`
+	WebUI           WebUIConfig          `yaml:"web_ui" json:"web_ui"`
+	QueryLog        QueryLogConfig       `yaml:"query_log" json:"query_log"`
+	ConfigDir       string               `yaml:"-" json:"-"`
 }
 
 type TLSCertConfig struct {
@@ -60,7 +61,15 @@ type ListenConfig struct {
 	DOH     string `yaml:"doh" json:"doh"`
 	DoHPath string `yaml:"doh_path" json:"doh_path"`
 	DOT     string `yaml:"dot" json:"dot"`
+	DoTSNI  string `yaml:"dot_sni" json:"dot_sni"`
 	DOQ     string `yaml:"doq" json:"doq"`
+	DoQSNI  string `yaml:"doq_sni" json:"doq_sni"`
+}
+
+type ParallelReturnConfig struct {
+	Enabled   bool            `yaml:"enabled" json:"enabled"`
+	Listen    ListenConfig    `yaml:"listen" json:"listen"`
+	Upstreams UpstreamsConfig `yaml:"upstreams" json:"upstreams"`
 }
 
 type UpstreamsConfig struct {
@@ -116,6 +125,21 @@ func LoadConfig(configPath string) (*Config, error) {
 	normalizePort(&cfg.Listen.DOH)
 	normalizePort(&cfg.Listen.DOT)
 	normalizePort(&cfg.Listen.DOQ)
+	cfg.Listen.DoHPath = normalizeDoHPath(cfg.Listen.DoHPath)
+	cfg.Listen.DoTSNI = normalizeServerName(cfg.Listen.DoTSNI)
+	cfg.Listen.DoQSNI = normalizeServerName(cfg.Listen.DoQSNI)
+	normalizePort(&cfg.ParallelReturn.Listen.DNSUDP)
+	normalizePort(&cfg.ParallelReturn.Listen.DNSTCP)
+	normalizePort(&cfg.ParallelReturn.Listen.DOH)
+	normalizePort(&cfg.ParallelReturn.Listen.DOT)
+	normalizePort(&cfg.ParallelReturn.Listen.DOQ)
+	cfg.ParallelReturn.Listen.DoHPath = normalizeDoHPath(cfg.ParallelReturn.Listen.DoHPath)
+	cfg.ParallelReturn.Listen.DoTSNI = normalizeServerName(cfg.ParallelReturn.Listen.DoTSNI)
+	cfg.ParallelReturn.Listen.DoQSNI = normalizeServerName(cfg.ParallelReturn.Listen.DoQSNI)
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
 	cfg.Hosts = make(map[string]string)
 	cfg.Rules = make(map[string]string)
@@ -175,6 +199,21 @@ func (c *Config) Save(configPath string) error {
 	normalizePort(&c.Listen.DOH)
 	normalizePort(&c.Listen.DOT)
 	normalizePort(&c.Listen.DOQ)
+	c.Listen.DoHPath = normalizeDoHPath(c.Listen.DoHPath)
+	c.Listen.DoTSNI = normalizeServerName(c.Listen.DoTSNI)
+	c.Listen.DoQSNI = normalizeServerName(c.Listen.DoQSNI)
+	normalizePort(&c.ParallelReturn.Listen.DNSUDP)
+	normalizePort(&c.ParallelReturn.Listen.DNSTCP)
+	normalizePort(&c.ParallelReturn.Listen.DOH)
+	normalizePort(&c.ParallelReturn.Listen.DOT)
+	normalizePort(&c.ParallelReturn.Listen.DOQ)
+	c.ParallelReturn.Listen.DoHPath = normalizeDoHPath(c.ParallelReturn.Listen.DoHPath)
+	c.ParallelReturn.Listen.DoTSNI = normalizeServerName(c.ParallelReturn.Listen.DoTSNI)
+	c.ParallelReturn.Listen.DoQSNI = normalizeServerName(c.ParallelReturn.Listen.DoQSNI)
+
+	if err := c.Validate(); err != nil {
+		return err
+	}
 
 	relPath := func(p string) string {
 		if strings.HasPrefix(p, configDir) {
@@ -308,4 +347,61 @@ func GetDefaultConfigPath() string {
 	}
 
 	return "config.yaml"
+}
+
+func normalizeDoHPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if !strings.HasPrefix(path, "/") {
+		return "/" + path
+	}
+	return path
+}
+
+func normalizeServerName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func effectiveDoHPath(path string) string {
+	if path == "" {
+		return "/dns-query"
+	}
+	return normalizeDoHPath(path)
+}
+
+func (c *Config) Validate() error {
+	if !c.ParallelReturn.Enabled {
+		return nil
+	}
+
+	mainListen := c.Listen
+	parallelListen := c.ParallelReturn.Listen
+
+	if mainListen.DOH != "" && parallelListen.DOH != "" && mainListen.DOH == parallelListen.DOH {
+		if effectiveDoHPath(mainListen.DoHPath) == effectiveDoHPath(parallelListen.DoHPath) {
+			return fmt.Errorf("DoH 监听端口复用时，主服务和并行返回必须使用不同的路径")
+		}
+	}
+
+	if mainListen.DOT != "" && parallelListen.DOT != "" && mainListen.DOT == parallelListen.DOT {
+		if mainListen.DoTSNI == "" || parallelListen.DoTSNI == "" {
+			return fmt.Errorf("DoT 监听端口复用时，主服务和并行返回都必须配置 SNI")
+		}
+		if mainListen.DoTSNI == parallelListen.DoTSNI {
+			return fmt.Errorf("DoT 监听端口复用时，主服务和并行返回必须使用不同的 SNI")
+		}
+	}
+
+	if mainListen.DOQ != "" && parallelListen.DOQ != "" && mainListen.DOQ == parallelListen.DOQ {
+		if mainListen.DoQSNI == "" || parallelListen.DoQSNI == "" {
+			return fmt.Errorf("DoQ 监听端口复用时，主服务和并行返回都必须配置 SNI")
+		}
+		if mainListen.DoQSNI == parallelListen.DoQSNI {
+			return fmt.Errorf("DoQ 监听端口复用时，主服务和并行返回必须使用不同的 SNI")
+		}
+	}
+
+	return nil
 }

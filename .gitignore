@@ -1,5 +1,6 @@
 .vscode
 build/
+DEBUG.md
 build.ps1
 config.yaml
 hosts.txt

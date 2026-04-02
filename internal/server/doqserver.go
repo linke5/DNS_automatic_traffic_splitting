@@ -24,14 +24,20 @@ type DoQServer struct {
 	cfg      *config.Config
 	cm       *util.CertManager
 	listener *quic.Listener
+	mode     string
 }
 
 func NewDoQServer(cfg *config.Config, r *router.Router, cm *util.CertManager) *DoQServer {
+	return NewDoQServerWithMode(cfg, r, cm, "standard")
+}
+
+func NewDoQServerWithMode(cfg *config.Config, r *router.Router, cm *util.CertManager, mode string) *DoQServer {
 	return &DoQServer{
 		addr:   cfg.Listen.DOQ,
 		router: r,
 		cfg:    cfg,
 		cm:     cm,
+		mode:   mode,
 	}
 }
 
@@ -116,6 +122,10 @@ func (s *DoQServer) handleQuicConnection(conn *quic.Conn) {
 }
 
 func (s *DoQServer) handleQuicStream(stream *quic.Stream, remoteAddr net.Addr) {
+	handleDoQStreamWithRouter(stream, remoteAddr, s.router, s.addr, s.mode)
+}
+
+func handleDoQStreamWithRouter(stream *quic.Stream, remoteAddr net.Addr, r *router.Router, listenAddr, mode string) {
 	defer stream.Close()
 
 	lengthBytes := make([]byte, 2)
@@ -150,8 +160,13 @@ func (s *DoQServer) handleQuicStream(stream *quic.Stream, remoteAddr net.Addr) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	ctx = router.WithRequestMeta(ctx, router.RequestMeta{
+		Listener:     "doq",
+		ListenerPort: listenAddr,
+		ServiceMode:  mode,
+	})
 
-	resp, err := s.router.Route(ctx, req, clientIP)
+	resp, err := r.Route(ctx, req, clientIP)
 	if err != nil {
 		log.Printf("DoQ: Error routing DNS query for %s: %v", qName, err)
 		resp = new(dns.Msg)

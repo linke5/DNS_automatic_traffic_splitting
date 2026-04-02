@@ -17,6 +17,9 @@ type LogEntry struct {
 	ID            int64          `json:"id"`
 	Time          time.Time      `json:"time"`
 	ClientIP      string         `json:"client_ip"`
+	Listener      string         `json:"listener,omitempty"`
+	ListenerPort  string         `json:"listener_port,omitempty"`
+	ServiceMode   string         `json:"service_mode,omitempty"`
 	DownstreamECS string         `json:"downstream_ecs,omitempty"`
 	Domain        string         `json:"domain"`
 	Type          string         `json:"type"`

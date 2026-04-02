@@ -29,14 +29,20 @@ type DoHServer struct {
 }
 
 func NewDoHServer(cfg *config.Config, r *router.Router, cm *util.CertManager) *DoHServer {
+	return NewDoHServerWithMode(cfg, r, cm, "standard")
+}
+
+func NewDoHServerWithMode(cfg *config.Config, r *router.Router, cm *util.CertManager, mode string) *DoHServer {
 	dohPath := cfg.Listen.DoHPath
 	if dohPath == "" {
 		dohPath = "/dns-query"
 	}
 
 	dohHandler := &DoHRequestHandler{
-		router: r,
-		path:   dohPath,
+		router:     r,
+		path:       dohPath,
+		listenAddr: cfg.Listen.DOH,
+		mode:       mode,
 	}
 
 	var tlsConfig *tls.Config
@@ -147,8 +153,10 @@ func (s *DoHServer) Stop() error {
 }
 
 type DoHRequestHandler struct {
-	router *router.Router
-	path   string
+	router     *router.Router
+	path       string
+	listenAddr string
+	mode       string
 }
 
 func (h *DoHRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -210,6 +218,11 @@ func (h *DoHRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+	ctx = router.WithRequestMeta(ctx, router.RequestMeta{
+		Listener:     "doh",
+		ListenerPort: h.listenAddr,
+		ServiceMode:  h.mode,
+	})
 
 	resp, err := h.router.Route(ctx, req, clientIP)
 	if err != nil {
@@ -227,4 +240,3 @@ func (h *DoHRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/dns-message")
 	w.Write(packedResp)
 }
-
