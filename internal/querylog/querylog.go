@@ -20,6 +20,7 @@ type LogEntry struct {
 	Listener      string         `json:"listener,omitempty"`
 	ListenerPort  string         `json:"listener_port,omitempty"`
 	ServiceMode   string         `json:"service_mode,omitempty"`
+	ReturnMode    string         `json:"return_mode,omitempty"`
 	DownstreamECS string         `json:"downstream_ecs,omitempty"`
 	Domain        string         `json:"domain"`
 	Type          string         `json:"type"`
@@ -38,12 +39,17 @@ type AnswerRecord struct {
 }
 
 type Stats struct {
-	StartTime     time.Time        `json:"start_time"`
-	TotalQueries  int64            `json:"total_queries"`
-	TotalCN       int64            `json:"total_cn"`
-	TotalOverseas int64            `json:"total_overseas"`
-	TopClients    map[string]int64 `json:"top_clients"`
-	TopDomains    map[string]int64 `json:"top_domains"`
+	StartTime            time.Time        `json:"start_time"`
+	TotalQueries         int64            `json:"total_queries"`
+	TotalCN              int64            `json:"total_cn"`
+	TotalOverseas        int64            `json:"total_overseas"`
+	TotalRaceFirst       int64            `json:"total_race_first"`
+	TotalAggregateCache  int64            `json:"total_aggregate_cache"`
+	AggregateWarmups     int64            `json:"aggregate_warmups"`
+	AggregateWarmSuccess int64            `json:"aggregate_warm_success"`
+	HotRefreshTriggers   int64            `json:"hot_refresh_triggers"`
+	TopClients           map[string]int64 `json:"top_clients"`
+	TopDomains           map[string]int64 `json:"top_domains"`
 }
 
 type QueryLogger struct {
@@ -130,6 +136,12 @@ func (l *QueryLogger) updateStats(entry *LogEntry) {
 	} else if strings.Contains(entry.Upstream, "Overseas") {
 		l.stats.TotalOverseas++
 	}
+	switch entry.ReturnMode {
+	case "race-first":
+		l.stats.TotalRaceFirst++
+	case "aggregate-cache":
+		l.stats.TotalAggregateCache++
+	}
 	l.stats.TopClients[entry.ClientIP]++
 	l.stats.TopDomains[entry.Domain]++
 }
@@ -139,6 +151,21 @@ func (l *QueryLogger) addToMemory(entry *LogEntry) {
 	if len(l.logs) > maxMemoryLogs {
 		l.logs = l.logs[1:]
 	}
+}
+
+func (l *QueryLogger) RecordAggregateWarmup(success bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.stats.AggregateWarmups++
+	if success {
+		l.stats.AggregateWarmSuccess++
+	}
+}
+
+func (l *QueryLogger) RecordHotRefreshTrigger() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.stats.HotRefreshTriggers++
 }
 
 func (l *QueryLogger) appendToFile(entry LogEntry) {
@@ -264,6 +291,10 @@ func (l *QueryLogger) GetLogs(offset, limit int, search string) ([]*LogEntry, in
 		if searchLower != "" {
 			match := strings.Contains(strings.ToLower(entry.ClientIP), searchLower) ||
 				strings.Contains(strings.ToLower(entry.DownstreamECS), searchLower) ||
+				strings.Contains(strings.ToLower(entry.Listener), searchLower) ||
+				strings.Contains(strings.ToLower(entry.ListenerPort), searchLower) ||
+				strings.Contains(strings.ToLower(entry.ServiceMode), searchLower) ||
+				strings.Contains(strings.ToLower(entry.ReturnMode), searchLower) ||
 				strings.Contains(strings.ToLower(entry.Domain), searchLower) ||
 				strings.Contains(strings.ToLower(entry.Type), searchLower) ||
 				strings.Contains(strings.ToLower(entry.Upstream), searchLower) ||
@@ -376,6 +407,10 @@ func matches(entry *LogEntry, searchLower string) bool {
 	}
 	return strings.Contains(strings.ToLower(entry.ClientIP), searchLower) ||
 		strings.Contains(strings.ToLower(entry.DownstreamECS), searchLower) ||
+		strings.Contains(strings.ToLower(entry.Listener), searchLower) ||
+		strings.Contains(strings.ToLower(entry.ListenerPort), searchLower) ||
+		strings.Contains(strings.ToLower(entry.ServiceMode), searchLower) ||
+		strings.Contains(strings.ToLower(entry.ReturnMode), searchLower) ||
 		strings.Contains(strings.ToLower(entry.Domain), searchLower) ||
 		strings.Contains(strings.ToLower(entry.Type), searchLower) ||
 		strings.Contains(strings.ToLower(entry.Upstream), searchLower) ||

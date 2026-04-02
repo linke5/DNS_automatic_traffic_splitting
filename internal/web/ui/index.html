@@ -420,7 +420,69 @@
                         </div>
                     </div>
 
-                    <div class="glass-card rounded-2xl p-6 lg:col-span-2 flex flex-col">
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center"><i class="fa-solid fa-bolt mr-2 text-amber-500"></i> {{ t('stats_return_mode_distribution') }}</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium text-slate-700 dark:text-slate-300 flex items-center"><span class="w-2 h-2 rounded-full bg-amber-500 mr-2"></span>{{ t('return_mode_race_first') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">{{ stats.total_race_first }}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                                    <div class="bg-amber-500 h-3 rounded-full transition-all duration-1000 ease-out" :style="{width: getPercentage(stats.total_race_first, stats.total_queries) + '%'}"></div>
+                                </div>
+                                <div class="text-right text-xs text-slate-500 mt-1">{{ getPercentage(stats.total_race_first, stats.total_queries) }}%</div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium text-slate-700 dark:text-slate-300 flex items-center"><span class="w-2 h-2 rounded-full bg-cyan-500 mr-2"></span>{{ t('return_mode_aggregate_cache') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">{{ stats.total_aggregate_cache }}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                                    <div class="bg-cyan-500 h-3 rounded-full transition-all duration-1000 ease-out" :style="{width: getPercentage(stats.total_aggregate_cache, stats.total_queries) + '%'}"></div>
+                                </div>
+                                <div class="text-right text-xs text-slate-500 mt-1">{{ getPercentage(stats.total_aggregate_cache, stats.total_queries) }}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center"><i class="fa-solid fa-wave-square mr-2 text-emerald-500"></i> {{ t('stats_aggregate_cache_hit_rate') }}</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium text-slate-700 dark:text-slate-300">{{ t('return_mode_aggregate_cache') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">{{ getPercentage(stats.total_aggregate_cache, stats.total_queries) }}%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                                    <div class="bg-emerald-500 h-3 rounded-full transition-all duration-1000 ease-out" :style="{width: getPercentage(stats.total_aggregate_cache, stats.total_queries) + '%'}"></div>
+                                </div>
+                                <div class="text-right text-xs text-slate-500 mt-1">{{ stats.total_aggregate_cache }} / {{ stats.total_queries }}</div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium text-slate-700 dark:text-slate-300">{{ t('stats_aggregate_warm_success_rate') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">{{ getPercentage(stats.aggregate_warm_success, stats.aggregate_warmups) }}%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                                    <div class="bg-sky-500 h-3 rounded-full transition-all duration-1000 ease-out" :style="{width: getPercentage(stats.aggregate_warm_success, stats.aggregate_warmups) + '%'}"></div>
+                                </div>
+                                <div class="text-right text-xs text-slate-500 mt-1">{{ stats.aggregate_warm_success }} / {{ stats.aggregate_warmups }}</div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium text-slate-700 dark:text-slate-300">{{ t('stats_hot_refresh_triggers') }}</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">{{ formatNumber(stats.hot_refresh_triggers) }}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                                    <div class="bg-violet-500 h-3 rounded-full transition-all duration-1000 ease-out" :style="{width: getPercentage(stats.hot_refresh_triggers, stats.total_queries) + '%'}"></div>
+                                </div>
+                                <div class="text-right text-xs text-slate-500 mt-1">{{ stats.hot_refresh_triggers }} / {{ stats.total_queries }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-2xl p-6 lg:col-span-3 flex flex-col">
                          <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center"><i class="fa-solid fa-server mr-2 text-blue-500"></i> {{ t('stats_upstream_perf') }}</h3>
                          
                          <div class="overflow-auto flex-1 max-h-96 pr-2 custom-scrollbar">
@@ -514,6 +576,9 @@
                                     {{ t('log_listener') }}
                                 </th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                                    {{ t('log_return_mode') }}
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                                     {{ t('log_answer') }}
                                 </th>
                                 <th @click="sortBy('upstream')" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 group">
@@ -542,6 +607,7 @@
                                     <div class="font-mono text-slate-700 dark:text-slate-200">{{ (log.listener || '-').toUpperCase() }} {{ log.listener_port || '' }}</div>
                                     <div class="text-slate-400 dark:text-slate-500">{{ log.service_mode === 'parallel' ? t('service_mode_parallel') : t('service_mode_standard') }}</div>
                                 </td>
+                                <td class="px-4 py-2 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">{{ formatReturnMode(log.return_mode) }}</td>
                                 <td class="px-4 py-2 text-slate-600 dark:text-slate-300 font-mono text-xs truncate max-w-[200px]" :title="log.answer">{{ log.answer }}</td>
                                 <td class="px-4 py-2 whitespace-nowrap">
                                     <span class="px-2 py-0.5 inline-flex text-xs leading-4 font-medium rounded-full" :class="getUpstreamClass(log.upstream)">
@@ -554,7 +620,7 @@
                                 <td class="px-4 py-2 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono text-xs">{{ log.duration_ms }}ms</td>
                             </tr>
                             <tr v-if="logs.length === 0">
-                                <td colspan="9" class="px-4 py-12 text-center text-slate-400">
+                                <td colspan="10" class="px-4 py-12 text-center text-slate-400">
                                     <i class="fa-solid fa-inbox text-4xl mb-3 opacity-30"></i>
                                     <p>{{ t('no_logs') }}</p>
                                 </td>
@@ -643,6 +709,27 @@
                     <div class="p-6 space-y-6 bg-white dark:bg-slate-950">
                         <p class="text-sm text-slate-500 dark:text-slate-400">{{ t('parallel_return_help') }}</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                            <form-input :label="t('parallel_warm_cache_ttl')" v-model.number="config.parallel_return.warm_cache_ttl" type="number" placeholder="5" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{{ t('parallel_aggregate_cache_ttl_mode') }}</label>
+                                <select :disabled="!canEdit || !config.parallel_return.enabled" v-model="config.parallel_return.aggregate_cache_ttl_mode" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border shadow-sm bg-white dark:bg-slate-950 dark:text-white disabled:bg-slate-100 disabled:text-slate-500 h-10 transition-all">
+                                    <option value="fixed">{{ t('ttl_mode_fixed') }}</option>
+                                    <option value="upstream">{{ t('ttl_mode_upstream') }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{{ t('parallel_aggregate_ttl_strategy') }}</label>
+                                <select :disabled="!canEdit || !config.parallel_return.enabled" v-model="config.parallel_return.aggregate_ttl_strategy" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border shadow-sm bg-white dark:bg-slate-950 dark:text-white disabled:bg-slate-100 disabled:text-slate-500 h-10 transition-all">
+                                    <option value="min">{{ t('ttl_strategy_min') }}</option>
+                                    <option value="median">{{ t('ttl_strategy_median') }}</option>
+                                    <option value="max">{{ t('ttl_strategy_max') }}</option>
+                                    <option value="avg">{{ t('ttl_strategy_avg') }}</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <toggle-switch :label="t('parallel_single_record_per_type')" v-model="config.parallel_return.single_record_per_type" :disabled="!canEdit || !config.parallel_return.enabled"></toggle-switch>
+                            </div>
+                            <form-input :label="t('parallel_aggregate_cache_ttl')" v-model.number="config.parallel_return.aggregate_cache_ttl" type="number" placeholder="30" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
                             <form-input :label="t('dns_udp')" v-model="config.parallel_return.listen.dns_udp" placeholder="5353" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
                             <form-input :label="t('dns_tcp')" v-model="config.parallel_return.listen.dns_tcp" placeholder="5353" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
                             <form-input :label="t('doh_https')" v-model="config.parallel_return.listen.doh" placeholder="8443" :disabled="!canEdit || !config.parallel_return.enabled"></form-input>
@@ -1033,6 +1120,7 @@
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_downstream_ecs') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.downstream_ecs || '-' }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_listener') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ (modal.log.listener || '-').toUpperCase() }} {{ modal.log.listener_port || '' }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_service_mode') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.service_mode === 'parallel' ? t('service_mode_parallel') : t('service_mode_standard') }}</span></div>
+                    <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_return_mode') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ formatReturnMode(modal.log.return_mode) }}</span></div>
                     <div class="col-span-2"><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_domain') }}</span> <span class="font-bold text-lg text-slate-900 dark:text-white break-all">{{ modal.log.domain }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_type') }}</span> <span class="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200">{{ modal.log.type }}</span></div>
                     <div><span class="text-slate-500 dark:text-slate-400 block text-xs uppercase">{{ t('log_duration') }}</span> <span class="font-mono text-slate-800 dark:text-slate-200">{{ modal.log.duration_ms }}ms</span></div>
@@ -1112,15 +1200,20 @@ const i18nData = {
         stats_uptime: "持续运行",
         stats_ports: "监听端口",
         stats_traffic_distribution: "流量分流比例",
+        stats_return_mode_distribution: "返回模式分布",
+        stats_aggregate_cache_hit_rate: "聚合缓存命中率",
+        stats_aggregate_warm_success_rate: "后台聚合成功率",
+        stats_hot_refresh_triggers: "热门续热触发次数",
         stats_upstream_perf: "上游服务器性能",
         top_clients: "活跃客户端",
         top_domains: "热点域名",
         logs_title: "最近查询记录",
-        filter_logs_placeholder: "搜索 客户端IP / ECS / 域名 / 类型 / 状态...",
+                        filter_logs_placeholder: "搜索 客户端IP / ECS / 域名 / 类型 / 状态 / race-first / aggregate-cache...",
         log_time: "时间",
         log_client: "客户端",
         log_listener: "入站监听",
         log_service_mode: "服务模式",
+        log_return_mode: "返回模式",
         log_downstream_ecs: "下游 ECS",
         log_domain: "请求域名",
         log_type: "类型",
@@ -1130,6 +1223,8 @@ const i18nData = {
         log_duration: "耗时",
         service_mode_standard: "普通组",
         service_mode_parallel: "并行组",
+        return_mode_race_first: "首包竞速",
+        return_mode_aggregate_cache: "聚合缓存",
         no_logs: "暂无查询日志",
         setting_querylog: "日志记录设置",
         setting_listen: "服务监听端口",
@@ -1138,6 +1233,17 @@ const i18nData = {
         setting_parallel_return: "并行返回",
         setting_parallel_listen: "并行返回监听",
         setting_parallel_upstreams: "并行返回上游组",
+        parallel_warm_cache_ttl: "并行返回预热TTL(秒)",
+        parallel_aggregate_cache_ttl: "聚合缓存TTL(秒)",
+        parallel_aggregate_cache_ttl_mode: "聚合缓存TTL模式",
+        parallel_aggregate_ttl_strategy: "重复记录TTL聚合策略",
+        parallel_single_record_per_type: "首包竞速时每种记录类型只返回一条",
+        ttl_mode_fixed: "固定秒数",
+        ttl_mode_upstream: "跟随上游TTL",
+        ttl_strategy_min: "最小值",
+        ttl_strategy_median: "中位值",
+        ttl_strategy_max: "最大值",
+        ttl_strategy_avg: "平均值",
         parallel_return_enabled: "启用并行返回",
         parallel_return_help: "保留原有 Geo 分流策略，但对命中的上游组并发查询并把多个成功解析结果原样聚合返回给下游。",
         setting_hosts: "自定义 Hosts",
@@ -1219,15 +1325,20 @@ const i18nData = {
         stats_uptime: "Uptime",
         stats_ports: "Listening Ports",
         stats_traffic_distribution: "Traffic Split",
+        stats_return_mode_distribution: "Return Mode Split",
+        stats_aggregate_cache_hit_rate: "Aggregate Cache Hit Rate",
+        stats_aggregate_warm_success_rate: "Warm Aggregate Success Rate",
+        stats_hot_refresh_triggers: "Hot Refresh Triggers",
         stats_upstream_perf: "Upstream Performance",
         top_clients: "Top Clients",
         top_domains: "Top Domains",
         logs_title: "Query Log",
-        filter_logs_placeholder: "Search Client IP / ECS / Domain / Type / Status...",
+        filter_logs_placeholder: "Search Client IP / ECS / Domain / Type / Status / race-first / aggregate-cache...",
         log_time: "Time",
         log_client: "Client",
         log_listener: "Listener",
         log_service_mode: "Service Mode",
+        log_return_mode: "Return Mode",
         log_downstream_ecs: "Downstream ECS",
         log_domain: "Domain",
         log_type: "Type",
@@ -1237,6 +1348,8 @@ const i18nData = {
         log_duration: "Duration",
         service_mode_standard: "Standard",
         service_mode_parallel: "Parallel",
+        return_mode_race_first: "Race First",
+        return_mode_aggregate_cache: "Aggregate Cache",
         no_logs: "No logs found",
         setting_querylog: "Query Log",
         setting_listen: "Listening Ports",
@@ -1245,6 +1358,17 @@ const i18nData = {
         setting_parallel_return: "Parallel Return",
         setting_parallel_listen: "Parallel Return Listen",
         setting_parallel_upstreams: "Parallel Return Upstreams",
+        parallel_warm_cache_ttl: "Warm Cache TTL (s)",
+        parallel_aggregate_cache_ttl: "Aggregate Cache TTL (s)",
+        parallel_aggregate_cache_ttl_mode: "Aggregate Cache TTL Mode",
+        parallel_aggregate_ttl_strategy: "Duplicate TTL Strategy",
+        parallel_single_record_per_type: "Single Record Per Type On Race First",
+        ttl_mode_fixed: "Fixed Seconds",
+        ttl_mode_upstream: "Follow Upstream TTL",
+        ttl_strategy_min: "Minimum",
+        ttl_strategy_median: "Median",
+        ttl_strategy_max: "Maximum",
+        ttl_strategy_avg: "Average",
         parallel_return_enabled: "Enable Parallel Return",
         parallel_return_help: "Keep the existing Geo split strategy, but query all servers in the selected group and merge successful answers back to downstream clients.",
         setting_hosts: "Custom Hosts",
@@ -1405,6 +1529,11 @@ const app = Vue.createApp({
                 upstreams: { cn: [], overseas: [] },
                 parallel_return: {
                     enabled: false,
+                    warm_cache_ttl: 5,
+                    aggregate_cache_ttl: 30,
+                    aggregate_cache_ttl_mode: 'fixed',
+                    aggregate_ttl_strategy: 'median',
+                    single_record_per_type: false,
                     listen: { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' },
                     upstreams: { cn: [], overseas: [] }
                 },
@@ -1545,6 +1674,11 @@ const app = Vue.createApp({
         formatListenPort(portValue) {
             return portValue && portValue.startsWith(':') ? portValue.substring(1) : portValue;
         },
+        formatReturnMode(mode) {
+            if (mode === 'race-first') return this.t('return_mode_race_first');
+            if (mode === 'aggregate-cache') return this.t('return_mode_aggregate_cache');
+            return '-';
+        },
         getStartTime(uptime) {
             if (!uptime) return '-';
             const now = new Date();
@@ -1634,11 +1768,16 @@ const app = Vue.createApp({
                 if(!this.config.tls_certificates) this.config.tls_certificates = [];
                 if(!this.config.upstreams.cn) this.config.upstreams.cn = [];
                 if(!this.config.upstreams.overseas) this.config.upstreams.overseas = [];
-                if(!this.config.parallel_return) this.config.parallel_return = { enabled: false, listen: { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' }, upstreams: { cn: [], overseas: [] } };
+                if(!this.config.parallel_return) this.config.parallel_return = { enabled: false, warm_cache_ttl: 5, aggregate_cache_ttl: 30, aggregate_cache_ttl_mode: 'fixed', aggregate_ttl_strategy: 'median', single_record_per_type: false, listen: { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' }, upstreams: { cn: [], overseas: [] } };
                 if(!this.config.parallel_return.listen) this.config.parallel_return.listen = { dns_udp: '', dns_tcp: '', doh: '', doh_path: '', dot: '', dot_sni: '', doq: '', doq_sni: '' };
                 if(!this.config.parallel_return.upstreams) this.config.parallel_return.upstreams = { cn: [], overseas: [] };
                 if(!this.config.parallel_return.upstreams.cn) this.config.parallel_return.upstreams.cn = [];
                 if(!this.config.parallel_return.upstreams.overseas) this.config.parallel_return.upstreams.overseas = [];
+                if(!this.config.parallel_return.warm_cache_ttl || this.config.parallel_return.warm_cache_ttl <= 0) this.config.parallel_return.warm_cache_ttl = 5;
+                if(!this.config.parallel_return.aggregate_cache_ttl || this.config.parallel_return.aggregate_cache_ttl <= 0) this.config.parallel_return.aggregate_cache_ttl = 30;
+                if(!this.config.parallel_return.aggregate_cache_ttl_mode) this.config.parallel_return.aggregate_cache_ttl_mode = 'fixed';
+                if(!this.config.parallel_return.aggregate_ttl_strategy) this.config.parallel_return.aggregate_ttl_strategy = 'median';
+                if(this.config.parallel_return.single_record_per_type === undefined) this.config.parallel_return.single_record_per_type = false;
                 if(!this.config.auto_cert) this.config.auto_cert = { domains: [] };
                 if(!this.config.web_ui) this.config.web_ui = { guest_mode: false };
                 if(this.config.web_ui && this.config.web_ui.guest_mode === undefined) this.config.web_ui.guest_mode = false;
@@ -1695,6 +1834,14 @@ const app = Vue.createApp({
                 if(cleanConfig.parallel_return && cleanConfig.parallel_return.upstreams) {
                     if(cleanConfig.parallel_return.upstreams.cn) cleanConfig.parallel_return.upstreams.cn.forEach(s => delete s._id);
                     if(cleanConfig.parallel_return.upstreams.overseas) cleanConfig.parallel_return.upstreams.overseas.forEach(s => delete s._id);
+                }
+                if(cleanConfig.parallel_return) {
+                    const ttl = parseInt(cleanConfig.parallel_return.warm_cache_ttl, 10);
+                    cleanConfig.parallel_return.warm_cache_ttl = Number.isFinite(ttl) && ttl > 0 ? ttl : 5;
+                    const aggregateTTL = parseInt(cleanConfig.parallel_return.aggregate_cache_ttl, 10);
+                    cleanConfig.parallel_return.aggregate_cache_ttl = Number.isFinite(aggregateTTL) && aggregateTTL > 0 ? aggregateTTL : 30;
+                    cleanConfig.parallel_return.aggregate_cache_ttl_mode = cleanConfig.parallel_return.aggregate_cache_ttl_mode === 'upstream' ? 'upstream' : 'fixed';
+                    cleanConfig.parallel_return.aggregate_ttl_strategy = ['min', 'median', 'max', 'avg'].includes(cleanConfig.parallel_return.aggregate_ttl_strategy) ? cleanConfig.parallel_return.aggregate_ttl_strategy : 'median';
                 }
 
                 cleanConfig.hosts = {};

@@ -67,9 +67,14 @@ type ListenConfig struct {
 }
 
 type ParallelReturnConfig struct {
-	Enabled   bool            `yaml:"enabled" json:"enabled"`
-	Listen    ListenConfig    `yaml:"listen" json:"listen"`
-	Upstreams UpstreamsConfig `yaml:"upstreams" json:"upstreams"`
+	Enabled               bool            `yaml:"enabled" json:"enabled"`
+	WarmCacheTTL          int             `yaml:"warm_cache_ttl" json:"warm_cache_ttl"`
+	AggregateCacheTTL     int             `yaml:"aggregate_cache_ttl" json:"aggregate_cache_ttl"`
+	AggregateCacheTTLMode string          `yaml:"aggregate_cache_ttl_mode" json:"aggregate_cache_ttl_mode"`
+	AggregateTTLStrategy  string          `yaml:"aggregate_ttl_strategy" json:"aggregate_ttl_strategy"`
+	SingleRecordPerType   bool            `yaml:"single_record_per_type" json:"single_record_per_type"`
+	Listen                ListenConfig    `yaml:"listen" json:"listen"`
+	Upstreams             UpstreamsConfig `yaml:"upstreams" json:"upstreams"`
 }
 
 type UpstreamsConfig struct {
@@ -136,6 +141,18 @@ func LoadConfig(configPath string) (*Config, error) {
 	cfg.ParallelReturn.Listen.DoHPath = normalizeDoHPath(cfg.ParallelReturn.Listen.DoHPath)
 	cfg.ParallelReturn.Listen.DoTSNI = normalizeServerName(cfg.ParallelReturn.Listen.DoTSNI)
 	cfg.ParallelReturn.Listen.DoQSNI = normalizeServerName(cfg.ParallelReturn.Listen.DoQSNI)
+	if cfg.ParallelReturn.WarmCacheTTL <= 0 {
+		cfg.ParallelReturn.WarmCacheTTL = 5
+	}
+	if cfg.ParallelReturn.AggregateCacheTTL <= 0 {
+		cfg.ParallelReturn.AggregateCacheTTL = 30
+	}
+	if cfg.ParallelReturn.AggregateCacheTTLMode == "" {
+		cfg.ParallelReturn.AggregateCacheTTLMode = "fixed"
+	}
+	if cfg.ParallelReturn.AggregateTTLStrategy == "" {
+		cfg.ParallelReturn.AggregateTTLStrategy = "median"
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -210,6 +227,18 @@ func (c *Config) Save(configPath string) error {
 	c.ParallelReturn.Listen.DoHPath = normalizeDoHPath(c.ParallelReturn.Listen.DoHPath)
 	c.ParallelReturn.Listen.DoTSNI = normalizeServerName(c.ParallelReturn.Listen.DoTSNI)
 	c.ParallelReturn.Listen.DoQSNI = normalizeServerName(c.ParallelReturn.Listen.DoQSNI)
+	if c.ParallelReturn.WarmCacheTTL <= 0 {
+		c.ParallelReturn.WarmCacheTTL = 5
+	}
+	if c.ParallelReturn.AggregateCacheTTL <= 0 {
+		c.ParallelReturn.AggregateCacheTTL = 30
+	}
+	if c.ParallelReturn.AggregateCacheTTLMode == "" {
+		c.ParallelReturn.AggregateCacheTTLMode = "fixed"
+	}
+	if c.ParallelReturn.AggregateTTLStrategy == "" {
+		c.ParallelReturn.AggregateTTLStrategy = "median"
+	}
 
 	if err := c.Validate(); err != nil {
 		return err

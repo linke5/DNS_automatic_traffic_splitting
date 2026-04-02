@@ -30,22 +30,27 @@ var (
 )
 
 type DashboardStats struct {
-	UptimeSeconds    int64            `json:"uptime_seconds"`
-	MemoryUsageMB    float64          `json:"memory_usage_mb"`
-	NumGoroutines    int              `json:"num_goroutines"`
-	TotalQueries     int64            `json:"total_queries"`
-	TotalCN          int64            `json:"total_cn"`
-	TotalOverseas    int64            `json:"total_overseas"`
-	ListenDNSUDP     string           `json:"listen_dns_udp"`
-	ListenDNSTCP     string           `json:"listen_dns_tcp"`
-	ListenDOH        string           `json:"listen_doh"`
-	ListenDOT        string           `json:"listen_dot"`
-	ListenDOQ        string           `json:"listen_doq"`
-	UpstreamCN       int              `json:"upstream_cn_count"`
-	UpstreamOverseas int              `json:"upstream_overseas_count"`
-	UpstreamStats    []interface{}    `json:"upstream_stats,omitempty"`
-	TopClients       map[string]int64 `json:"top_clients"`
-	TopDomains       map[string]int64 `json:"top_domains"`
+	UptimeSeconds        int64            `json:"uptime_seconds"`
+	MemoryUsageMB        float64          `json:"memory_usage_mb"`
+	NumGoroutines        int              `json:"num_goroutines"`
+	TotalQueries         int64            `json:"total_queries"`
+	TotalCN              int64            `json:"total_cn"`
+	TotalOverseas        int64            `json:"total_overseas"`
+	TotalRaceFirst       int64            `json:"total_race_first"`
+	TotalAggregateCache  int64            `json:"total_aggregate_cache"`
+	AggregateWarmups     int64            `json:"aggregate_warmups"`
+	AggregateWarmSuccess int64            `json:"aggregate_warm_success"`
+	HotRefreshTriggers   int64            `json:"hot_refresh_triggers"`
+	ListenDNSUDP         string           `json:"listen_dns_udp"`
+	ListenDNSTCP         string           `json:"listen_dns_tcp"`
+	ListenDOH            string           `json:"listen_doh"`
+	ListenDOT            string           `json:"listen_dot"`
+	ListenDOQ            string           `json:"listen_doq"`
+	UpstreamCN           int              `json:"upstream_cn_count"`
+	UpstreamOverseas     int              `json:"upstream_overseas_count"`
+	UpstreamStats        []interface{}    `json:"upstream_stats,omitempty"`
+	TopClients           map[string]int64 `json:"top_clients"`
+	TopDomains           map[string]int64 `json:"top_domains"`
 }
 
 type TestResult struct {
@@ -475,25 +480,33 @@ func StartWebServer(mgr *manager.ServiceManager) {
 		currentCfg := mgr.Config
 
 		resp := DashboardStats{
-			UptimeSeconds:    int64(time.Since(stats.StartTime).Seconds()),
-			MemoryUsageMB:    float64(m.Alloc) / 1024 / 1024,
-			NumGoroutines:    runtime.NumGoroutine(),
-			TotalQueries:     stats.TotalQueries,
-			TotalCN:          stats.TotalCN,
-			TotalOverseas:    stats.TotalOverseas,
-			ListenDNSUDP:     currentCfg.Listen.DNSUDP,
-			ListenDNSTCP:     currentCfg.Listen.DNSTCP,
-			ListenDOH:        currentCfg.Listen.DOH,
-			ListenDOT:        currentCfg.Listen.DOT,
-			ListenDOQ:        currentCfg.Listen.DOQ,
-			UpstreamCN:       len(currentCfg.Upstreams.CN),
-			UpstreamOverseas: len(currentCfg.Upstreams.Overseas),
-			TopClients:       stats.TopClients,
-			TopDomains:       stats.TopDomains,
+			UptimeSeconds:        int64(time.Since(stats.StartTime).Seconds()),
+			MemoryUsageMB:        float64(m.Alloc) / 1024 / 1024,
+			NumGoroutines:        runtime.NumGoroutine(),
+			TotalQueries:         stats.TotalQueries,
+			TotalCN:              stats.TotalCN,
+			TotalOverseas:        stats.TotalOverseas,
+			TotalRaceFirst:       stats.TotalRaceFirst,
+			TotalAggregateCache:  stats.TotalAggregateCache,
+			AggregateWarmups:     stats.AggregateWarmups,
+			AggregateWarmSuccess: stats.AggregateWarmSuccess,
+			HotRefreshTriggers:   stats.HotRefreshTriggers,
+			ListenDNSUDP:         currentCfg.Listen.DNSUDP,
+			ListenDNSTCP:         currentCfg.Listen.DNSTCP,
+			ListenDOH:            currentCfg.Listen.DOH,
+			ListenDOT:            currentCfg.Listen.DOT,
+			ListenDOQ:            currentCfg.Listen.DOQ,
+			UpstreamCN:           len(currentCfg.Upstreams.CN),
+			UpstreamOverseas:     len(currentCfg.Upstreams.Overseas),
+			TopClients:           stats.TopClients,
+			TopDomains:           stats.TopDomains,
 		}
 
 		if mgr.Router != nil {
-			resp.UpstreamStats = mgr.Router.GetUpstreamStats()
+			resp.UpstreamStats = append(resp.UpstreamStats, mgr.Router.GetUpstreamStats()...)
+		}
+		if mgr.ParallelRouter != nil {
+			resp.UpstreamStats = append(resp.UpstreamStats, mgr.ParallelRouter.GetUpstreamStats()...)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

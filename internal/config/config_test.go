@@ -43,3 +43,16 @@ func TestValidateAllowsSharedPortsWithDistinctSelectors(t *testing.T) {
 		t.Fatalf("expected config to be valid, got %v", err)
 	}
 }
+
+func TestParallelReturnWarmCacheTTLDefaultsToFive(t *testing.T) {
+	cfg := &Config{}
+	if cfg.ParallelReturn.WarmCacheTTL != 0 {
+		t.Fatalf("expected zero value before normalization, got %d", cfg.ParallelReturn.WarmCacheTTL)
+	}
+	if cfg.ParallelReturn.WarmCacheTTL <= 0 {
+		cfg.ParallelReturn.WarmCacheTTL = 5
+	}
+	if cfg.ParallelReturn.WarmCacheTTL != 5 {
+		t.Fatalf("expected default warm cache ttl to be 5, got %d", cfg.ParallelReturn.WarmCacheTTL)
+	}
+}

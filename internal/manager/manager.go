@@ -22,10 +22,11 @@ type ServiceManager struct {
 	mu     sync.Mutex
 	Config *config.Config
 
-	GeoManager  *router.GeoDataManager
-	Router      *router.Router
-	CertManager *util.CertManager
-	QueryLog    *querylog.QueryLogger
+	GeoManager     *router.GeoDataManager
+	Router         *router.Router
+	ParallelRouter *router.Router
+	CertManager    *util.CertManager
+	QueryLog       *querylog.QueryLogger
 
 	DNSServer            *server.DNSServer
 	DoTServer            *server.DoTServer
@@ -258,6 +259,9 @@ func (m *ServiceManager) startInternal() error {
 		parallelCfg.Listen = cfg.ParallelReturn.Listen
 		parallelCfg.Upstreams = cfg.ParallelReturn.Upstreams
 		parallelRouter = router.NewRouterWithMode(&parallelCfg, m.GeoManager, m.QueryLog, true)
+		m.ParallelRouter = parallelRouter
+	} else {
+		m.ParallelRouter = nil
 	}
 
 	cm, err := util.NewCertManager(cfg)

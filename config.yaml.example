@@ -51,6 +51,11 @@ upstreams:
 
 parallel_return:
   enabled: false
+  warm_cache_ttl: 5
+  aggregate_cache_ttl: 30
+  aggregate_cache_ttl_mode: "fixed"
+  aggregate_ttl_strategy: "median"
+  single_record_per_type: false
   listen:
     dns_udp: "5353"
     dns_tcp: "5353"

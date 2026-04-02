@@ -2,13 +2,13 @@
 
 set -euo pipefail
 
-readonly REPO="Hamster-Prime/DNS_automatic_traffic_splitting"
-readonly INSTALL_DIR="/usr/local/bin"
-readonly CONFIG_DIR="/etc/doh-autoproxy"
-readonly SERVICE_NAME="doh-autoproxy"
-readonly BINARY_NAME="doh-autoproxy"
+readonly REPO="${DOH_AUTOPROXY_REPO:-Hamster-Prime/DNS_automatic_traffic_splitting}"
+readonly INSTALL_DIR="${DOH_AUTOPROXY_INSTALL_DIR:-/usr/local/bin}"
+readonly CONFIG_DIR="${DOH_AUTOPROXY_CONFIG_DIR:-/etc/doh-autoproxy}"
+readonly SERVICE_NAME="${DOH_AUTOPROXY_SERVICE_NAME:-doh-autoproxy}"
+readonly BINARY_NAME="${DOH_AUTOPROXY_BINARY_NAME:-doh-autoproxy}"
 readonly SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-readonly RELEASE_BASE_URL="https://github.com/${REPO}/releases/latest/download"
+readonly RELEASE_TAG="${DOH_AUTOPROXY_RELEASE_TAG:-latest}"
 readonly PROGRAM_NAME="${0##*/}"
 
 if [ -t 1 ]; then
@@ -51,6 +51,19 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+show_platform_hints() {
+  info "Required tools: bash, install, curl or wget"
+  info "Recommended runtime: Linux with systemd"
+
+  if [ -f /etc/debian_version ]; then
+    info "Debian/Ubuntu hint: sudo apt update && sudo apt install -y curl ca-certificates systemd"
+  elif [ -f /etc/redhat-release ]; then
+    info "CentOS/RHEL/Rocky/Alma hint: sudo dnf install -y curl ca-certificates systemd"
+  elif [ -f /etc/alpine-release ]; then
+    info "Alpine hint: sudo apk add curl ca-certificates"
+  fi
+}
+
 require_root() {
   if [ "${EUID:-$(id -u)}" -ne 0 ]; then
     die "Please run this script as root. Example: sudo bash ${PROGRAM_NAME} install"
@@ -82,6 +95,16 @@ download_file() {
       die "No download tool is available."
       ;;
   esac
+}
+
+release_asset_url() {
+  local asset_name="$1"
+
+  if [ "$RELEASE_TAG" = "latest" ]; then
+    printf 'https://github.com/%s/releases/latest/download/%s' "$REPO" "$asset_name"
+  else
+    printf 'https://github.com/%s/releases/download/%s/%s' "$REPO" "$RELEASE_TAG" "$asset_name"
+  fi
 }
 
 detect_platform() {
@@ -126,8 +149,8 @@ install_binary() {
   mkdir -p "$INSTALL_DIR"
   tmp_file="$(mktemp "${TMPDIR:-/tmp}/${BINARY_NAME}.XXXXXX")"
 
-  info "Downloading ${ASSET_NAME} from GitHub Releases..."
-  download_file "${RELEASE_BASE_URL}/${ASSET_NAME}" "$tmp_file"
+  info "Downloading ${ASSET_NAME} from GitHub Releases (${RELEASE_TAG})..."
+  download_file "$(release_asset_url "$ASSET_NAME")" "$tmp_file"
 
   install -m 0755 "$tmp_file" "$target_path"
   rm -f "$tmp_file"
@@ -192,6 +215,11 @@ upstreams:
 
 parallel_return:
   enabled: false
+  warm_cache_ttl: 5
+  aggregate_cache_ttl: 30
+  aggregate_cache_ttl_mode: "fixed"
+  aggregate_ttl_strategy: "median"
+  single_record_per_type: false
   listen:
     dns_udp: "5353"
     dns_tcp: "5353"
@@ -377,6 +405,7 @@ do_install() {
   require_root
   ensure_download_tool
   detect_platform
+  show_platform_hints
 
   if command_exists systemctl && systemctl is-active --quiet "$SERVICE_NAME"; then
     was_active=1
@@ -450,6 +479,12 @@ Commands:
   help              Show this help message
 
 If no command is provided, "install" is used by default.
+
+Environment overrides:
+  DOH_AUTOPROXY_REPO         GitHub repo, default: ${REPO}
+  DOH_AUTOPROXY_RELEASE_TAG  Release tag, default: ${RELEASE_TAG}
+  DOH_AUTOPROXY_INSTALL_DIR  Binary install dir, default: ${INSTALL_DIR}
+  DOH_AUTOPROXY_CONFIG_DIR   Config dir, default: ${CONFIG_DIR}
 EOF
 }
 
