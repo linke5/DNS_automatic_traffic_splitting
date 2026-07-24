@@ -30,6 +30,7 @@ type SharedDoHServer struct {
 	http2Server *http.Server
 	http3Server *http3.Server
 	entries     map[string]*sharedDoHEntry
+	fallback    http.Handler
 	mu          sync.RWMutex
 }
 
@@ -118,24 +119,36 @@ func (s *SharedDoHServer) Start() {
 func (s *SharedDoHServer) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	var firstErr error
 	if s.http2Server != nil {
 		if err := s.http2Server.Shutdown(ctx); err != nil {
-			return err
+			firstErr = err
 		}
 	}
 	if s.http3Server != nil {
-		if err := s.http3Server.Close(); err != nil {
-			return err
+		if err := s.http3Server.Close(); err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
-	return nil
+	return firstErr
+}
+
+func (s *SharedDoHServer) SetFallback(handler http.Handler) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fallback = handler
 }
 
 func (s *SharedDoHServer) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	entry := s.entries[r.URL.Path]
+	fallback := s.fallback
 	s.mu.RUnlock()
 	if entry == nil {
+		if fallback != nil {
+			fallback.ServeHTTP(w, r)
+			return
+		}
 		http.NotFound(w, r)
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"doh-autoproxy/internal/config"
 	"doh-autoproxy/internal/manager"
 	"doh-autoproxy/internal/resolver"
+	"doh-autoproxy/internal/util"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -524,6 +525,17 @@ func StartWebServer(mgr *manager.ServiceManager) {
 		log.Fatalf("Failed to embed UI: %v", err)
 	}
 	mux.Handle("/", http.FileServer(http.FS(uiAssets)))
+
+	webPort := util.ParsePort(addr)
+	dohPort := util.ParsePort(cfg.Listen.DOHAddr())
+	if webPort > 0 && webPort == dohPort {
+		if mgr.AttachSharedDoHFallback(mux) {
+			log.Printf("WebUI attached to shared DoH listener on %s", cfg.Listen.DOHAddr())
+		} else {
+			log.Printf("WebUI cannot reuse %s because the shared DoH listener is unavailable", addr)
+		}
+		return
+	}
 
 	go func() {
 		certManager := mgr.GetCertManager()

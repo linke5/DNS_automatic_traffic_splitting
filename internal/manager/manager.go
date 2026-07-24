@@ -38,7 +38,8 @@ type ServiceManager struct {
 	SharedDoQServer      *server.SharedDoQServer
 	ACMEServer           *http.Server
 
-	stopAutoUpdate chan struct{}
+	sharedDoHFallback http.Handler
+	stopAutoUpdate    chan struct{}
 }
 
 func NewServiceManager(initialCfg *config.Config) *ServiceManager {
@@ -46,6 +47,17 @@ func NewServiceManager(initialCfg *config.Config) *ServiceManager {
 		Config:         initialCfg,
 		stopAutoUpdate: make(chan struct{}),
 	}
+}
+
+func (m *ServiceManager) AttachSharedDoHFallback(handler http.Handler) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.SharedDoHServer == nil {
+		return false
+	}
+	m.sharedDoHFallback = handler
+	m.SharedDoHServer.SetFallback(handler)
+	return true
 }
 
 func (m *ServiceManager) Start() error {
@@ -314,6 +326,9 @@ func (m *ServiceManager) startInternal() error {
 			return fmt.Errorf("shared DoH TLS init failed: %w", err)
 		}
 		m.SharedDoHServer = server.NewSharedDoHServer(cfg.Listen.DOHAddr(), entries, tlsConfig)
+		if m.sharedDoHFallback != nil {
+			m.SharedDoHServer.SetFallback(m.sharedDoHFallback)
+		}
 		m.SharedDoHServer.Start()
 	}
 

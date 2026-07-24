@@ -317,6 +317,24 @@ Web UI 支持：
 - 热门续热触发次数
 - 上游性能统计（普通组和并行组）
 
+当主服务和并行返回已共享同一个 DoH 端口时，Web UI 也可以复用该监听端口。DoH 路径会优先匹配，其余路径由 Web UI 处理。
+
+```yaml
+listen:
+  doh: "443"
+  doh_path: "/dns-query"
+
+parallel_return:
+  enabled: true
+  listen:
+    doh: "443"
+    doh_path: "/multi/dns-query"
+
+web_ui:
+  enabled: true
+  address: ":443"
+```
+
 ## 常见用途
 
 - 作为本地或服务器上的 DNS 分流代理

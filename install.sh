@@ -256,6 +256,7 @@ geo_data:
 
 web_ui:
   enabled: true
+  # Set this to the shared main/parallel DoH port to reuse that listener.
   address: ":8080"
   username: ""
   password: ""
